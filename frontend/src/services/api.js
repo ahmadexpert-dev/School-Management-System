@@ -5,6 +5,9 @@ export const API_ORIGIN = API_BASE_URL.replace(/\/api\/?$/, '');
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  // A hung backend/DB connection should surface as an error, not spin the
+  // UI forever — 20s comfortably covers a cold start on shared hosting.
+  timeout: 20_000,
 });
 
 api.interceptors.request.use((config) => {

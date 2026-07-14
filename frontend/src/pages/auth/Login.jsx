@@ -19,7 +19,11 @@ export default function Login() {
       await login(email, password);
       navigate('/dashboard');
     } catch (err) {
-      setError(err.response?.data?.error || 'Login failed');
+      if (err.code === 'ECONNABORTED') {
+        setError('The server took too long to respond. Please try again in a moment.');
+      } else {
+        setError(err.response?.data?.error || 'Login failed');
+      }
     } finally {
       setIsSubmitting(false);
     }

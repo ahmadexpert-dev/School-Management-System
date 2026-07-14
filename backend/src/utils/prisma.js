@@ -11,6 +11,16 @@ const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({
   connectionString,
   ssl: connectionString?.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
+  // Fail fast instead of hanging forever if the host can't reach the DB
+  // (e.g. an outbound network restriction) — without this, a stuck
+  // connection just hangs every request with no visible error.
+  connectionTimeoutMillis: 10_000,
+});
+
+pool.on('error', (err) => {
+  // A pooled client emitting an error in the background (e.g. connection
+  // dropped) would otherwise crash the whole process — log and move on.
+  console.error('[pg pool] unexpected error on idle client', err);
 });
 const adapter = new PrismaPg(pool);
 
