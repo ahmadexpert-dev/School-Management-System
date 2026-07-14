@@ -1,0 +1,11 @@
+# Serves the built React SPA correctly on Hostinger's Apache hosting:
+# any path that isn't a real file falls back to index.html so client-side
+# routes (e.g. /dashboard/students) don't 404 on a hard refresh.
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  RewriteRule ^index\.html$ - [L]
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteRule . /index.html [L]
+</IfModule>

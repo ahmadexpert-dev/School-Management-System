@@ -1,0 +1,493 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  admin
+  teacher
+  staff
+  parent
+}
+
+enum AttendanceStatus {
+  present
+  absent
+  leave
+}
+
+enum FeeStatus {
+  paid
+  partial
+  unpaid
+}
+
+enum DiscountType {
+  sibling
+  staff
+  scholarship
+  hardship
+  none
+}
+
+enum NotificationType {
+  sms
+  whatsapp
+}
+
+enum NotificationStatus {
+  sent
+  failed
+  pending
+}
+
+enum CalendarEventType {
+  holiday
+  event
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+enum StudentStatus {
+  active
+  inactive
+}
+
+enum StaffStatus {
+  active
+  inactive
+}
+
+model School {
+  id                String   @id @default(uuid())
+  name              String
+  address           String?
+  contactPhone      String?
+  subscriptionTier  String   @default("basic")
+  createdAt         DateTime @default(now())
+
+  users             User[]
+  classes           Class[]
+  students          Student[]
+  staff             Staff[]
+  attendances       Attendance[]
+  feeRecords        FeeRecord[]
+  exams             Exam[]
+  examSubjects      ExamSubject[]
+  grades            Grade[]
+  notificationLogs  NotificationLog[]
+  classTeachers     ClassTeacher[]
+  todos             Todo[]
+  staffAttendances  StaffAttendance[]
+  timetableEntries  TimetableEntry[]
+  calendarEvents    CalendarEvent[]
+  leaveRequests     LeaveRequest[]
+  notices           Notice[]
+  userPermissions   UserPermission[]
+  departments       Department[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  schoolId     String
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role
+  phone        String?
+  createdAt    DateTime @default(now())
+
+  school              School       @relation(fields: [schoolId], references: [id])
+  markedAttendances   Attendance[] @relation("MarkedByUser")
+  assignedClasses     ClassTeacher[]
+  childrenAsParent    Student[]    @relation("ParentOfStudent")
+  todos               Todo[]
+  passwordResetTokens PasswordResetToken[]
+  staffAttendances    StaffAttendance[]
+  timetableEntries    TimetableEntry[]
+  calendarEventsMade  CalendarEvent[]      @relation("EventCreatedBy")
+  leaveRequests       LeaveRequest[]       @relation("LeaveRequester")
+  leaveReviews        LeaveRequest[]       @relation("LeaveReviewer")
+  noticesPosted       Notice[]             @relation("NoticePostedBy")
+  permissions         UserPermission[]
+
+  @@index([schoolId])
+}
+
+model Class {
+  id          String @id @default(uuid())
+  schoolId    String
+  className   String
+  standardFee Decimal @db.Decimal(10, 2)
+
+  school   School    @relation(fields: [schoolId], references: [id])
+  students Student[]
+  exams    Exam[]
+  teachers ClassTeacher[]
+  timetableEntries TimetableEntry[]
+
+  @@index([schoolId])
+}
+
+// Links a teacher (User with role=teacher) to the classes they are assigned
+// to. Used to scope attendance/grades routes so a teacher only sees their
+// own classes, per the "teacher limited to assigned classes" requirement.
+model ClassTeacher {
+  id        String @id @default(uuid())
+  schoolId  String
+  teacherId String
+  classId   String
+
+  school  School @relation(fields: [schoolId], references: [id])
+  teacher User   @relation(fields: [teacherId], references: [id])
+  class   Class  @relation(fields: [classId], references: [id])
+
+  @@unique([teacherId, classId])
+  @@index([schoolId])
+  @@index([teacherId])
+  @@index([classId])
+}
+
+model Student {
+  id                String        @id @default(uuid())
+  schoolId          String
+  classId           String
+  name              String
+  section           String?
+  admissionDate     DateTime
+  guardianName      String?
+  guardianPhone     String?
+  parentUserId      String?
+  customFeeOverride Decimal?      @db.Decimal(10, 2)
+  discountType      DiscountType? @default(none)
+  discountNotes     String?
+  status            StudentStatus @default(active)
+
+  // Admission-form detail fields
+  studentCode    String?
+  photoUrl       String?
+  gender         String?
+  dateOfBirth    DateTime?
+  placeOfBirth   String?
+  bFormNumber    String?
+  religion       String?
+  surname        String?
+  fatherIdCard   String?
+  fatherEmail    String?
+  motherPhone    String?
+  whatsappNumber String?
+  homeAddress    String?
+  previousSchool String?
+  remarks        String?
+
+  school            School             @relation(fields: [schoolId], references: [id])
+  class             Class              @relation(fields: [classId], references: [id])
+  parentUser        User?              @relation("ParentOfStudent", fields: [parentUserId], references: [id])
+  attendances       Attendance[]
+  feeRecords        FeeRecord[]
+  grades            Grade[]
+  notificationLogs  NotificationLog[]
+
+  @@unique([schoolId, studentCode])
+  @@index([schoolId])
+  @@index([classId])
+  @@index([parentUserId])
+}
+
+model Attendance {
+  id             String           @id @default(uuid())
+  schoolId       String
+  studentId      String
+  date           DateTime
+  status         AttendanceStatus
+  markedByUserId String
+
+  school    School @relation(fields: [schoolId], references: [id])
+  student   Student @relation(fields: [studentId], references: [id])
+  markedBy  User    @relation("MarkedByUser", fields: [markedByUserId], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([markedByUserId])
+}
+
+// Self-marked check-in attendance for logged-in staff (owner/admin/teacher/
+// staff) — distinct from the student Attendance model above. One record per
+// user per day; the unique constraint both enforces "once per day" and lets
+// a duplicate check-in attempt be caught cleanly as a conflict.
+model StaffAttendance {
+  id          String   @id @default(uuid())
+  schoolId    String
+  userId      String
+  date        DateTime
+  checkInTime DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([schoolId])
+  @@index([userId])
+}
+
+model FeeRecord {
+  id          String    @id @default(uuid())
+  schoolId    String
+  studentId   String
+  month       String
+  amountDue   Decimal   @db.Decimal(10, 2)
+  amountPaid  Decimal   @db.Decimal(10, 2) @default(0)
+  status      FeeStatus @default(unpaid)
+  dueDate     DateTime
+  paidDate    DateTime?
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId])
+}
+
+model Exam {
+  id       String   @id @default(uuid())
+  schoolId String
+  classId  String
+  examName String
+  term     String
+  date     DateTime
+
+  school   School        @relation(fields: [schoolId], references: [id])
+  class    Class         @relation(fields: [classId], references: [id])
+  subjects ExamSubject[]
+  grades   Grade[]
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+// Defines the subjects (and their total marks) for an exam once, up front —
+// so a teacher entering grades never re-types total marks per student.
+model ExamSubject {
+  id         String  @id @default(uuid())
+  schoolId   String
+  examId     String
+  subject    String
+  totalMarks Decimal @db.Decimal(6, 2)
+
+  school School @relation(fields: [schoolId], references: [id])
+  exam   Exam   @relation(fields: [examId], references: [id])
+
+  @@unique([examId, subject])
+  @@index([schoolId])
+  @@index([examId])
+}
+
+model Grade {
+  id            String @id @default(uuid())
+  schoolId      String
+  studentId     String
+  examId        String
+  subject       String
+  marksObtained Decimal @db.Decimal(6, 2)
+  totalMarks    Decimal @db.Decimal(6, 2)
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+  exam    Exam    @relation(fields: [examId], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([examId])
+}
+
+model Staff {
+  id           String      @id @default(uuid())
+  schoolId     String
+  name         String
+  role         String
+  subject      String?
+  phone        String?
+  email        String?
+  salary       Decimal     @db.Decimal(10, 2)
+  joiningDate  DateTime
+  employeeCode String?
+  photoUrl     String?
+  departmentId String?
+  status       StaffStatus @default(active)
+
+  school     School      @relation(fields: [schoolId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+
+  @@unique([schoolId, employeeCode])
+  @@index([schoolId])
+  @@index([departmentId])
+}
+
+model Department {
+  id       String @id @default(uuid())
+  schoolId String
+  name     String
+
+  school School  @relation(fields: [schoolId], references: [id])
+  staff  Staff[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+}
+
+// A single-use, time-limited token for the forgot/reset-password flow. Only
+// the SHA-256 hash of the token is stored — the raw token is only ever in
+// the (stubbed) delivery message, never persisted, so a DB read can't be
+// used to reset someone else's password.
+model PasswordResetToken {
+  id        String    @id @default(uuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+// Per-user personal task list shown on the dashboard. Scoped by both
+// schoolId (tenant isolation) and userId (never shared between users).
+model Todo {
+  id        String   @id @default(uuid())
+  schoolId  String
+  userId    String
+  text      String
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@index([schoolId])
+  @@index([userId])
+}
+
+// One weekly-recurring class period: which subject, which teacher, what
+// day/time. No date field — timetables are recurring per weekday, not
+// pinned to a calendar date.
+model TimetableEntry {
+  id        String  @id @default(uuid())
+  schoolId  String
+  classId   String
+  section   String?
+  dayOfWeek Int     // 0 = Sunday .. 6 = Saturday
+  startTime String  // "08:00"
+  endTime   String  // "08:45"
+  subject   String
+  teacherId String?
+
+  school  School @relation(fields: [schoolId], references: [id])
+  class   Class  @relation(fields: [classId], references: [id])
+  teacher User?  @relation(fields: [teacherId], references: [id])
+
+  @@index([schoolId])
+  @@index([classId])
+}
+
+// A single academic-calendar entry — a holiday (no school) or a general
+// event (PTM, sports day, etc.), optionally spanning multiple days.
+model CalendarEvent {
+  id              String            @id @default(uuid())
+  schoolId        String
+  title           String
+  description     String?
+  date            DateTime
+  endDate         DateTime?
+  type            CalendarEventType
+  createdByUserId String
+
+  school    School @relation(fields: [schoolId], references: [id])
+  createdBy User   @relation("EventCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([schoolId])
+}
+
+// A staff member's leave request, reviewed (approved/rejected) by an
+// owner/admin. userId is who's requesting; reviewedByUserId is who decided.
+model LeaveRequest {
+  id               String      @id @default(uuid())
+  schoolId         String
+  userId           String
+  fromDate         DateTime
+  toDate           DateTime
+  reason           String
+  status           LeaveStatus @default(pending)
+  reviewedByUserId String?
+  reviewNotes      String?
+  createdAt        DateTime    @default(now())
+
+  school     School @relation(fields: [schoolId], references: [id])
+  user       User   @relation("LeaveRequester", fields: [userId], references: [id])
+  reviewedBy User?  @relation("LeaveReviewer", fields: [reviewedByUserId], references: [id])
+
+  @@index([schoolId])
+  @@index([userId])
+}
+
+// A noticeboard post. audienceRoles empty = visible to everyone; otherwise
+// only the listed roles see it (e.g. ['teacher','staff'] for a staff-only memo).
+model Notice {
+  id             String   @id @default(uuid())
+  schoolId       String
+  title          String
+  content        String
+  audienceRoles  String[]
+  postedByUserId String
+  createdAt      DateTime @default(now())
+
+  school   School @relation(fields: [schoolId], references: [id])
+  postedBy User   @relation("NoticePostedBy", fields: [postedByUserId], references: [id])
+
+  @@index([schoolId])
+}
+
+// An additive permission grant: lets an owner/admin give a specific
+// teacher/staff user access to something their base role wouldn't normally
+// allow (e.g. letting one trusted teacher view Fees or Reports), without
+// building a full custom-role system. Checked alongside the existing fixed
+// Role enum, never instead of it.
+model UserPermission {
+  id       String @id @default(uuid())
+  schoolId String
+  userId   String
+  key      String // e.g. "fees:view", "reports:view", "classes:manage"
+
+  school School @relation(fields: [schoolId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, key])
+  @@index([schoolId])
+  @@index([userId])
+}
+
+model NotificationLog {
+  id        String             @id @default(uuid())
+  schoolId  String
+  studentId String
+  type      NotificationType
+  message   String
+  sentAt    DateTime?
+  status    NotificationStatus @default(pending)
+
+  school  School  @relation(fields: [schoolId], references: [id])
+  student Student @relation(fields: [studentId], references: [id])
+
+  @@index([schoolId])
+  @@index([studentId])
+}

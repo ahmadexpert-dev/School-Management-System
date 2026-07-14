@@ -1,0 +1,9 @@
+node_modules/
+.env
+backups/
+uploads/
+
+# public/ (the built frontend) is intentionally NOT ignored — it's
+# committed on purpose so `backend/` is a fully self-contained deployable
+# unit for Git-based hosting. Regenerate + commit it via
+# `npm run build:frontend` before pushing whenever the frontend changes.
