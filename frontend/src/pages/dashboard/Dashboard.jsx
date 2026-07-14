@@ -289,6 +289,36 @@ function TopPerformers({ topPerformers }) {
   );
 }
 
+const QUICK_ADD_ACTIONS = [
+  { to: '/dashboard/classes', label: 'Add Class', icon: 'building', gradient: ICON_GRADIENTS.blue },
+  { to: '/dashboard/users', label: 'Add Teacher', icon: 'book', gradient: ICON_GRADIENTS.aqua },
+  { to: '/dashboard/students', label: 'Add Student', icon: 'cap', gradient: ICON_GRADIENTS.violet },
+];
+
+// Always visible, regardless of onboarding progress — adding classes,
+// teachers, and students is an ongoing task, not a one-time setup step, so
+// unlike WelcomeBanner this never disappears once counts are non-zero.
+function QuickAdd() {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 p-4 mb-6">
+      <h2 className="text-sm font-semibold text-slate-700 mb-3">Quick add</h2>
+      <div className="flex flex-wrap gap-3">
+        {QUICK_ADD_ACTIONS.map((a) => (
+          <Link
+            key={a.to}
+            to={a.to}
+            className="flex items-center gap-2 rounded-lg px-3 py-2 text-white text-sm font-medium shadow-sm"
+            style={{ background: `linear-gradient(135deg, ${a.gradient[0]}, ${a.gradient[1]})` }}
+          >
+            <div className="w-4 h-4">{ICONS[a.icon]}</div>
+            {a.label}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function QuickLinks({ links }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4">
@@ -462,6 +492,8 @@ function AdminDashboard({ user }) {
               <p className="text-slate-500 text-sm">Here's what's happening in your school today.</p>
             </div>
           )}
+
+          <QuickAdd />
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <StatCard
