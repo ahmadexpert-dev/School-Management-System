@@ -11,10 +11,11 @@ const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({
   connectionString,
   ssl: connectionString?.includes('sslmode=require') ? { rejectUnauthorized: false } : undefined,
-  // Fail fast instead of hanging forever if the host can't reach the DB
-  // (e.g. an outbound network restriction) — without this, a stuck
-  // connection just hangs every request with no visible error.
-  connectionTimeoutMillis: 10_000,
+  // Fail fast with a clear error instead of hanging until the frontend's
+  // generic request timeout kicks in — makes a slow/blocked connection to
+  // the DB visible in the server logs with its own distinct message.
+  connectionTimeoutMillis: 8_000,
+  max: 5,
 });
 
 pool.on('error', (err) => {
@@ -22,6 +23,11 @@ pool.on('error', (err) => {
   // dropped) would otherwise crash the whole process — log and move on.
   console.error('[pg pool] unexpected error on idle client', err);
 });
+
+pool.on('connect', () => {
+  console.log(`[pg pool] new connection established at ${new Date().toISOString()}`);
+});
+
 const adapter = new PrismaPg(pool);
 
 // Single shared Prisma instance to avoid exhausting DB connections in dev (hot reload).

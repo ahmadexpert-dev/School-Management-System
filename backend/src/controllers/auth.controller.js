@@ -72,7 +72,13 @@ async function registerSchool(req, res) {
 async function login(req, res) {
   const { email, password } = req.body;
 
+  // Timed and logged explicitly — this is the very first query most users
+  // hit, so it's the fastest way to see in server logs whether a slow
+  // login is a DB-connection problem or something else entirely.
+  const dbStart = Date.now();
   const user = await prisma.user.findUnique({ where: { email } });
+  console.log(`[login] user lookup took ${Date.now() - dbStart}ms`);
+
   if (!user) {
     return res.status(401).json({ error: 'Invalid credentials' });
   }
