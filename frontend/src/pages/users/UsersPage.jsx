@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listUsers, createUser, updateUser, deleteUser } from '../../services/users';
+import PasswordInput from '../../components/PasswordInput';
 import { listClasses, assignTeacher } from '../../services/classes';
 import { listAvailablePermissions, listUserPermissions, setUserPermissions } from '../../services/permissions';
 import { useAuth } from '../../hooks/useAuth';
@@ -161,9 +162,8 @@ export default function UsersPage() {
             <label className="block text-xs font-medium text-slate-600 mb-1">
               {editingId ? 'New password (leave blank to keep)' : 'Password'}
             </label>
-            <input
+            <PasswordInput
               required={!editingId}
-              type="password"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="border border-slate-300 rounded px-3 py-1.5 text-sm w-full"

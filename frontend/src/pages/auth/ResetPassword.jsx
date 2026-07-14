@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { resetPassword } from '../../services/auth';
 import AuthBackground from '../../components/AuthBackground';
+import PasswordInput from '../../components/PasswordInput';
 
 export default function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -54,8 +55,7 @@ export default function ResetPassword() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">New password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             value={password}
@@ -66,8 +66,7 @@ export default function ResetPassword() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Confirm password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             minLength={8}
             value={confirmPassword}

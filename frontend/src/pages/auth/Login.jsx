@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import AuthBackground from '../../components/AuthBackground';
+import PasswordInput from '../../components/PasswordInput';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -66,8 +67,7 @@ export default function Login() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
-          <input
-            type="password"
+          <PasswordInput
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}

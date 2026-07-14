@@ -66,7 +66,15 @@ function ChevronIcon({ open }) {
   );
 }
 
-function NavGroup({ item }) {
+function MenuIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="w-5 h-5">
+      <path d="M3 6h18M3 12h18M3 18h18" />
+    </svg>
+  );
+}
+
+function NavGroup({ item, onNavigate }) {
   const location = useLocation();
   const hasActiveChild = item.children.some((c) => location.pathname === c.to);
   const [open, setOpen] = useState(hasActiveChild);
@@ -88,6 +96,7 @@ function NavGroup({ item }) {
             <NavLink
               key={child.to}
               to={child.to}
+              onClick={onNavigate}
               className={({ isActive }) =>
                 `flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-colors ${
                   isActive ? 'bg-white/15 text-white font-medium' : 'text-violet-100/70 hover:bg-white/10 hover:text-white'
@@ -106,12 +115,22 @@ function NavGroup({ item }) {
 
 export default function DashboardLayout() {
   const { user, logout } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const visibleItems = NAV_ITEMS.filter((item) => item.roles.includes(user?.role));
 
   return (
     <div className="min-h-screen flex bg-slate-50">
+      {sidebarOpen && (
+        <div
+          onClick={() => setSidebarOpen(false)}
+          className="fixed inset-0 bg-black/40 z-30 md:hidden"
+        />
+      )}
+
       <aside
-        className="w-60 flex flex-col shrink-0"
+        className={`fixed inset-y-0 left-0 z-40 w-64 flex flex-col shrink-0 transform transition-transform duration-200 md:relative md:translate-x-0 md:w-60 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
         style={{ background: 'linear-gradient(180deg, #2e1065 0%, #4c1d95 45%, #4338ca 100%)' }}
       >
         <div className="px-4 py-5 border-b border-white/10 flex items-center gap-2.5">
@@ -126,12 +145,13 @@ export default function DashboardLayout() {
         <nav className="flex-1 px-2.5 py-4 space-y-1 overflow-y-auto">
           {visibleItems.map((item) =>
             item.children ? (
-              <NavGroup key={item.label} item={item} />
+              <NavGroup key={item.label} item={item} onNavigate={() => setSidebarOpen(false)} />
             ) : (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
+                onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
                   `block rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
                     isActive ? 'bg-white/15 text-white shadow-sm' : 'text-violet-100/80 hover:bg-white/10 hover:text-white'
@@ -151,18 +171,27 @@ export default function DashboardLayout() {
           </button>
         </div>
       </aside>
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <header
-          className="px-6 py-3 flex items-center justify-between shrink-0"
+          className="px-3 sm:px-6 py-3 flex items-center justify-between shrink-0 gap-2"
           style={{ background: 'linear-gradient(90deg, #4338ca 0%, #6d28d9 100%)' }}
         >
-          <h1 className="text-white font-semibold text-sm">School Management System</h1>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="text-white font-medium">{user?.name}</span>
-            <span className="text-violet-200 capitalize">({user?.role})</span>
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="text-white p-1 -ml-1 md:hidden shrink-0"
+              aria-label="Open menu"
+            >
+              <MenuIcon />
+            </button>
+            <h1 className="text-white font-semibold text-sm truncate">School Management System</h1>
+          </div>
+          <div className="flex items-center gap-2 sm:gap-3 text-sm shrink-0">
+            <span className="text-white font-medium truncate max-w-[8rem] sm:max-w-none">{user?.name}</span>
+            <span className="text-violet-200 capitalize hidden sm:inline">({user?.role})</span>
           </div>
         </header>
-        <main className="flex-1 p-6 overflow-auto">
+        <main className="flex-1 p-3 sm:p-6 overflow-auto">
           <Outlet />
         </main>
       </div>
