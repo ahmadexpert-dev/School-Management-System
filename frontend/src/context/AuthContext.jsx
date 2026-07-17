@@ -24,7 +24,18 @@ export function AuthProvider({ children }) {
       setUser(null);
       setLogoutReason('expired');
     } else if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        // Corrupted/incompatible value (e.g. left over from an older app
+        // version) — previously this threw uncaught and blanked the whole
+        // page, since there's no error boundary. Clear it and fall back to
+        // logged-out instead.
+        localStorage.removeItem('sms_token');
+        localStorage.removeItem('sms_user');
+        setToken(null);
+        setUser(null);
+      }
     }
     setIsLoading(false);
   }, []);
