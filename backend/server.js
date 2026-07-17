@@ -27,6 +27,7 @@ const permissionRoutes = require('./src/routes/permission.routes');
 const departmentRoutes = require('./src/routes/department.routes');
 const { scheduleFeeReminderJob } = require('./src/jobs/feeReminder.job');
 const { scheduleBackupJob } = require('./src/jobs/backup.job');
+const { scheduleKeepAliveJob } = require('./src/jobs/keepAlive.job');
 
 const app = express();
 
@@ -91,4 +92,5 @@ app.listen(PORT, () => {
   console.log(`SMS backend running on http://localhost:${PORT}`);
   scheduleFeeReminderJob();
   scheduleBackupJob();
+  scheduleKeepAliveJob();
 });
