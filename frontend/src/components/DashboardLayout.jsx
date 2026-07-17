@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import SessionTimeoutMonitor from './SessionTimeoutMonitor';
 
 const NAV_ITEMS = [
   { to: '/dashboard', label: 'Home', roles: ['owner', 'admin', 'teacher', 'staff', 'parent'], end: true },
@@ -120,6 +121,7 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-screen flex bg-slate-50">
+      <SessionTimeoutMonitor />
       {sidebarOpen && (
         <div
           onClick={() => setSidebarOpen(false)}
@@ -166,7 +168,7 @@ export default function DashboardLayout() {
         <div className="px-4 py-3 border-t border-white/10 text-sm">
           <div className="text-white font-medium">{user?.name}</div>
           <div className="text-violet-200/70 capitalize mb-2">{user?.role}</div>
-          <button onClick={logout} className="text-rose-200 hover:text-white hover:underline text-sm">
+          <button onClick={() => logout()} className="text-rose-200 hover:text-white hover:underline text-sm">
             Logout
           </button>
         </div>

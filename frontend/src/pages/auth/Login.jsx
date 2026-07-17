@@ -1,8 +1,13 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import AuthBackground from '../../components/AuthBackground';
 import PasswordInput from '../../components/PasswordInput';
+
+const LOGOUT_REASON_MESSAGES = {
+  idle: "You were signed out after 20 minutes of inactivity. Please sign in again.",
+  expired: 'Your session expired. Please sign in again.',
+};
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -11,6 +16,8 @@ export default function Login() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const reasonMessage = LOGOUT_REASON_MESSAGES[searchParams.get('reason')];
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -47,6 +54,12 @@ export default function Login() {
           <h1 className="text-xl font-semibold text-slate-800">School Management System</h1>
           <p className="text-sm text-slate-500">Sign in to your school account</p>
         </div>
+
+        {!error && reasonMessage && (
+          <div className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+            {reasonMessage}
+          </div>
+        )}
 
         {error && (
           <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
