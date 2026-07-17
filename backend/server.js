@@ -36,7 +36,20 @@ app.use(cors({ origin: process.env.CLIENT_ORIGIN || 'http://localhost:5173' }));
 app.use(express.json());
 app.use('/api', apiLimiter);
 
-app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+// Includes the deployed commit hash so "did my last push actually deploy?"
+// is always answerable with one request, instead of guessing from
+// indirect signals like asset filenames or behavior changes.
+let deployedCommit = 'unknown';
+try {
+  deployedCommit = require('child_process')
+    .execSync('git rev-parse --short HEAD', { cwd: __dirname })
+    .toString()
+    .trim();
+} catch {
+  // Not a git checkout (or git unavailable) — leave as 'unknown' rather than fail startup.
+}
+
+app.get('/api/health', (req, res) => res.json({ status: 'ok', commit: deployedCommit }));
 
 // Uploaded student photos — served cross-origin so the Vite dev server (and
 // any separately-hosted frontend) can render them directly in <img> tags.
