@@ -1,10 +1,18 @@
 const prisma = require('../utils/prisma');
 
-// Generates the next sequential "EMP0001"-style code for a school, mirroring
-// the student admission code pattern.
+// Generates the next sequential "EMP0001"-style code for a school, based on
+// the highest existing code number rather than the current staff count —
+// counting rows breaks the moment any staff member has ever been deleted
+// (see the identical fix on the student admission code for the full story).
 async function generateEmployeeCode(schoolId) {
-  const count = await prisma.staff.count({ where: { schoolId } });
-  return `EMP${String(count + 1).padStart(4, '0')}`;
+  const staff = await prisma.staff.findMany({ where: { schoolId }, select: { employeeCode: true } });
+  let max = 0;
+  for (const s of staff) {
+    if (!s.employeeCode) continue;
+    const num = parseInt(s.employeeCode.slice(3), 10);
+    if (!isNaN(num) && num > max) max = num;
+  }
+  return `EMP${String(max + 1).padStart(4, '0')}`;
 }
 
 async function listStaff(req, res) {

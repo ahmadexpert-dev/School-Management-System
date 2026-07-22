@@ -24,12 +24,26 @@ const ADMISSION_DETAIL_FIELDS = [
   'remarks',
 ];
 
-// Generates the next sequential "ST0001"-style code for a school. Retries
-// once on a unique-constraint collision (concurrent admits), which is
-// sufficient given the low write concurrency of an admin admission form.
+// Generates the next sequential "ST0001"-style code for a school, based on
+// the highest existing code number rather than the current student count —
+// counting rows breaks the moment any student has ever been deleted (the
+// count drops, so "count + 1" recomputes a number that's already in use and
+// collides with the unique constraint). Scanning existing codes for the
+// true max is correct regardless of deletions.
+async function nextSequentialNumber(codes, prefix) {
+  let max = 0;
+  for (const code of codes) {
+    if (!code) continue;
+    const num = parseInt(code.slice(prefix.length), 10);
+    if (!isNaN(num) && num > max) max = num;
+  }
+  return max + 1;
+}
+
 async function generateStudentCode(schoolId) {
-  const count = await prisma.student.count({ where: { schoolId } });
-  return `ST${String(count + 1).padStart(4, '0')}`;
+  const students = await prisma.student.findMany({ where: { schoolId }, select: { studentCode: true } });
+  const next = await nextSequentialNumber(students.map((s) => s.studentCode), 'ST');
+  return `ST${String(next).padStart(4, '0')}`;
 }
 
 function generateTempPassword() {
@@ -162,8 +176,6 @@ async function createStudent(req, res) {
     }
   }
 
-  const studentCode = await generateStudentCode(req.schoolId);
-
   let parentAccount = null;
   if (req.body.createParentAccount) {
     parentAccount = await createOrLinkParentAccount(req.schoolId, {
@@ -173,23 +185,36 @@ async function createStudent(req, res) {
     });
   }
 
-  const student = await prisma.student.create({
-    data: {
-      schoolId: req.schoolId,
-      classId,
-      name,
-      section,
-      admissionDate: new Date(admissionDate),
-      guardianName,
-      guardianPhone,
-      customFeeOverride: customFeeOverride ?? null,
-      discountType: discountType ?? 'none',
-      discountNotes,
-      studentCode,
-      parentUserId: parentAccount?.parentUserId,
-      ...detailFields,
-    },
-  });
+  // Retries with a freshly recomputed code on a unique-constraint collision
+  // (e.g. two admissions submitted at nearly the same moment) rather than
+  // failing the whole admission outright.
+  let student;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const studentCode = await generateStudentCode(req.schoolId);
+    try {
+      student = await prisma.student.create({
+        data: {
+          schoolId: req.schoolId,
+          classId,
+          name,
+          section,
+          admissionDate: new Date(admissionDate),
+          guardianName,
+          guardianPhone,
+          customFeeOverride: customFeeOverride ?? null,
+          discountType: discountType ?? 'none',
+          discountNotes,
+          studentCode,
+          parentUserId: parentAccount?.parentUserId,
+          ...detailFields,
+        },
+      });
+      break;
+    } catch (err) {
+      const isCodeCollision = err.code === 'P2002' && err.meta?.target?.includes('studentCode');
+      if (!isCodeCollision || attempt === 2) throw err;
+    }
+  }
   return res.status(201).json({ student, parentAccount });
 }
 
@@ -249,7 +274,18 @@ async function deleteStudent(req, res) {
   });
   if (!existing) return res.status(404).json({ error: 'Student not found' });
 
-  await prisma.student.delete({ where: { id: existing.id } });
+  // Historical records reference the student with a RESTRICT foreign key
+  // (by design — an accidental cascade shouldn't silently wipe attendance/
+  // fee/grade history). An explicit "delete student" therefore has to
+  // deliberately clear those first; deactivating (Student.status) is the
+  // path that preserves history instead of this one.
+  await prisma.$transaction([
+    prisma.grade.deleteMany({ where: { studentId: existing.id, schoolId: req.schoolId } }),
+    prisma.attendance.deleteMany({ where: { studentId: existing.id, schoolId: req.schoolId } }),
+    prisma.feeRecord.deleteMany({ where: { studentId: existing.id, schoolId: req.schoolId } }),
+    prisma.notificationLog.deleteMany({ where: { studentId: existing.id, schoolId: req.schoolId } }),
+    prisma.student.delete({ where: { id: existing.id } }),
+  ]);
   return res.status(204).send();
 }
 
@@ -288,7 +324,8 @@ async function bulkAdmitStudents(req, res) {
   const cls = await prisma.class.findFirst({ where: { id: classId, schoolId: req.schoolId } });
   if (!cls) return res.status(404).json({ error: 'Class not found' });
 
-  const startCount = await prisma.student.count({ where: { schoolId: req.schoolId } });
+  const existing = await prisma.student.findMany({ where: { schoolId: req.schoolId }, select: { studentCode: true } });
+  const startNumber = await nextSequentialNumber(existing.map((s) => s.studentCode), 'ST');
 
   const created = await prisma.$transaction(
     students.map((s, i) =>
@@ -308,7 +345,7 @@ async function bulkAdmitStudents(req, res) {
           customFeeOverride: s.customFeeOverride ?? null,
           discountNotes: s.discountNotes,
           admissionDate: new Date(s.admissionDate || new Date()),
-          studentCode: `ST${String(startCount + i + 1).padStart(4, '0')}`,
+          studentCode: `ST${String(startNumber + i).padStart(4, '0')}`,
         },
       })
     )
