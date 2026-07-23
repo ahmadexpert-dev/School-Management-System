@@ -122,8 +122,13 @@ const assignTeacherSchema = z.object({
 });
 
 // ---- fees ----
+// The old /^\d{4}-\d{2}$/ regex only checked digit shape, so "2026-13" (not
+// a real month) passed validation — this checks the month part is 01-12.
+const monthString = () =>
+  z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'must be in YYYY-MM format with a valid month (01-12)');
+
 const generateMonthlyFeesSchema = z.object({
-  month: z.string().regex(/^\d{4}-\d{2}$/, 'must be in YYYY-MM format'),
+  month: monthString(),
   dueDate: dateString(),
   classId: z.string().optional(),
 });

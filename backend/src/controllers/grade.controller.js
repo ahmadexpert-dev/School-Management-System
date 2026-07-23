@@ -33,11 +33,20 @@ async function enterGrades(req, res) {
   const totalMarks = examSubject.totalMarks;
 
   const results = [];
+  const skipped = [];
   for (const { studentId, marksObtained } of marks) {
     const student = await prisma.student.findFirst({
       where: { id: studentId, schoolId: req.schoolId, classId: exam.classId },
     });
     if (!student) continue;
+
+    // marksObtained is already non-negative (validated at the schema
+    // level) — this is the missing other half: marks can't exceed the
+    // subject's total, or percentages/rankings downstream get corrupted.
+    if (marksObtained > Number(totalMarks)) {
+      skipped.push({ studentId, reason: `marksObtained (${marksObtained}) exceeds totalMarks (${totalMarks})` });
+      continue;
+    }
 
     const existing = await prisma.grade.findFirst({
       where: { schoolId: req.schoolId, studentId, examId, subject },
@@ -54,7 +63,7 @@ async function enterGrades(req, res) {
     results.push(grade);
   }
 
-  return res.status(201).json({ grades: results });
+  return res.status(201).json({ grades: results, skipped });
 }
 
 async function listGrades(req, res) {

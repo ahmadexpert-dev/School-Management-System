@@ -32,7 +32,10 @@ async function setUserPermissions(req, res) {
   if (!user) return res.status(404).json({ error: 'User not found' });
 
   const { keys } = req.body;
-  const validKeys = keys.filter((k) => AVAILABLE_PERMISSIONS.some((p) => p.key === k));
+  // Deduplicated — a repeated key in the incoming list would otherwise hit
+  // createMany with two identical (userId, key) rows and crash with a
+  // unique-constraint 500 instead of just applying the grant once.
+  const validKeys = [...new Set(keys.filter((k) => AVAILABLE_PERMISSIONS.some((p) => p.key === k)))];
 
   await prisma.$transaction([
     prisma.userPermission.deleteMany({ where: { schoolId: req.schoolId, userId: user.id } }),
