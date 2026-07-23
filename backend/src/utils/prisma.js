@@ -21,7 +21,13 @@ const pool = new Pool({
   // ceiling on any individual query/statement regardless of where it hangs.
   statement_timeout: 10_000,
   query_timeout: 10_000,
-  max: 5,
+  // Hostinger support confirmed the account is hitting "Max Processes"
+  // pressure on this shared plan — a smaller pool and shorter idle lifetime
+  // keeps our own footprint (concurrent connections, and Passenger process
+  // instances spawned to serve them) as small as possible, per their own
+  // "fewer parallel processes" guidance.
+  max: 2,
+  idleTimeoutMillis: 10_000,
 });
 
 pool.on('error', (err) => {
