@@ -30,6 +30,11 @@ async function listLeaveRequests(req, res) {
 
 async function createLeaveRequest(req, res) {
   const { fromDate, toDate, reason } = req.body;
+
+  if (new Date(toDate) < new Date(fromDate)) {
+    return res.status(400).json({ error: 'toDate must be on or after fromDate' });
+  }
+
   const request = await prisma.leaveRequest.create({
     data: {
       schoolId: req.schoolId,

@@ -50,6 +50,10 @@ async function createTimetableEntry(req, res) {
   const cls = await prisma.class.findFirst({ where: { id: classId, schoolId: req.schoolId } });
   if (!cls) return res.status(404).json({ error: 'Class not found' });
 
+  if (endTime <= startTime) {
+    return res.status(400).json({ error: 'endTime must be after startTime' });
+  }
+
   if (teacherId) {
     const teacher = await prisma.user.findFirst({
       where: { id: teacherId, schoolId: req.schoolId, role: { in: ['teacher', 'staff'] } },
@@ -68,6 +72,13 @@ async function updateTimetableEntry(req, res) {
   if (!existing) return res.status(404).json({ error: 'Timetable entry not found' });
 
   const { section, dayOfWeek, startTime, endTime, subject, teacherId } = req.body;
+
+  const effectiveStart = startTime ?? existing.startTime;
+  const effectiveEnd = endTime ?? existing.endTime;
+  if (effectiveEnd <= effectiveStart) {
+    return res.status(400).json({ error: 'endTime must be after startTime' });
+  }
+
   const entry = await prisma.timetableEntry.update({
     where: { id: existing.id },
     data: {

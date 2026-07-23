@@ -19,6 +19,11 @@ async function listEvents(req, res) {
 
 async function createEvent(req, res) {
   const { title, description, date, endDate, type } = req.body;
+
+  if (endDate && new Date(endDate) < new Date(date)) {
+    return res.status(400).json({ error: 'endDate must be on or after date' });
+  }
+
   const event = await prisma.calendarEvent.create({
     data: {
       schoolId: req.schoolId,
@@ -38,6 +43,13 @@ async function updateEvent(req, res) {
   if (!existing) return res.status(404).json({ error: 'Event not found' });
 
   const { title, description, date, endDate, type } = req.body;
+
+  const effectiveDate = date !== undefined ? new Date(date) : existing.date;
+  const effectiveEndDate = endDate !== undefined ? (endDate ? new Date(endDate) : null) : existing.endDate;
+  if (effectiveEndDate && effectiveEndDate < effectiveDate) {
+    return res.status(400).json({ error: 'endDate must be on or after date' });
+  }
+
   const event = await prisma.calendarEvent.update({
     where: { id: existing.id },
     data: {

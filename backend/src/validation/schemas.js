@@ -231,7 +231,10 @@ const updateTodoSchema = z.object({
 });
 
 // ---- timetable ----
-const timeString = () => z.string().regex(/^\d{2}:\d{2}$/, 'must be in HH:MM format');
+// The old /^\d{2}:\d{2}$/ regex only checked digit shape, so "25:99" (not a
+// real time) passed validation — this checks the hour is 00-23 and minute is 00-59.
+const timeString = () =>
+  z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'must be in HH:MM format (00:00-23:59)');
 
 const createTimetableEntrySchema = z.object({
   classId: req(),
