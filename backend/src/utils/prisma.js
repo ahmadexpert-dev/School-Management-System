@@ -15,6 +15,12 @@ const pool = new Pool({
   // generic request timeout kicks in — makes a slow/blocked connection to
   // the DB visible in the server logs with its own distinct message.
   connectionTimeoutMillis: 8_000,
+  // connectionTimeoutMillis only bounds acquiring a connection — a query
+  // that hangs *after* connecting (observed live: requests stuck 30s+ with
+  // no response at all) was previously unbounded. These two force a hard
+  // ceiling on any individual query/statement regardless of where it hangs.
+  statement_timeout: 10_000,
+  query_timeout: 10_000,
   max: 5,
 });
 
